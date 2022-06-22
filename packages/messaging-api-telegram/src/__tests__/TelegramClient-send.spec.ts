@@ -652,6 +652,23 @@ describe('send api', () => {
 
       expect(res).toEqual(result);
     });
+
+    it('should send document message to user with upload file', async () => {
+      const { client, mock } = createMock();
+      mock.onPost('/sendDocument').reply(200, reply);
+      const res = await client.sendDocument(
+        427770117,
+        { path: './README.md', fileName: 'document.txt' },
+        {
+          caption: 'gooooooodDocument',
+          thumb: 'thumb',
+          parseMode: ParseMode.Markdown,
+          disableNotification: true,
+          replyToMessageId: 9527,
+        }
+      );
+      expect(res).toEqual(result);
+    });
   });
 
   describe('#sendSticker', () => {

@@ -224,6 +224,18 @@ export type Document = {
   fileSize?: number;
 };
 
+export type InputFileByBuffer = {
+  buffer: Blob;
+  fileName?: string;
+};
+
+export type InputFileByPath = {
+  path: string;
+  fileName?: string;
+};
+
+export type InputFile = InputFileByPath | InputFileByBuffer;
+
 export type Video = {
   fileId: string;
   width: number;

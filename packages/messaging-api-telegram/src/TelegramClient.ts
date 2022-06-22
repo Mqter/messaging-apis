@@ -1,9 +1,14 @@
 import AxiosError from 'axios-error';
+import FormData from 'form-data';
 import axios, { AxiosInstance } from 'axios';
 import difference from 'lodash/difference';
 import invariant from 'ts-invariant';
 import isPlainObject from 'lodash/isPlainObject';
 import pick from 'lodash/pick';
+
+/*eslint-disable */
+import fs from 'fs';
+/* eslint-enable */
 import warning from 'warning';
 import {
   OnRequestFunction,
@@ -68,9 +73,52 @@ export default class TelegramClient {
     );
   }
 
+  private includesFileType(data: Record<string, any>) {
+    const hasProp = Object.prototype.hasOwnProperty;
+    return (
+      data &&
+      typeof data === 'object' &&
+      ((hasProp.call(data, 'document') && data.document.buffer) ||
+        (hasProp.call(data, 'document') && data.document.path))
+    );
+  }
+
+  private async buildFormData(data: Record<string, any>) {
+    const { chatId, document, ...options } = data;
+    let file;
+    if (data.document.path) {
+      file = await fs.promises
+        .readFile(data.document.path, 'binary')
+        .then((value) => {
+          return Buffer.from(value);
+        });
+    } else {
+      file = data.document.buffer;
+    }
+    const formData = new FormData();
+    formData.append('chat_id', data.chatId);
+    formData.append('document', file, data.document?.fileName || 'document');
+    for (const [key, value] of Object.entries(options)) {
+      formData.append(key, value.toString());
+    }
+
+    return {
+      body: formData,
+      headers: formData.getHeaders(),
+    };
+  }
+
   private async request(path: string, body: Record<string, any> = {}) {
     try {
-      const response = await this.axios.post(path, snakecaseKeysDeep(body));
+      let response;
+      if (this.includesFileType(body)) {
+        const configData = await this.buildFormData(body);
+        response = await this.axios.post(path, configData.body, {
+          headers: configData.headers,
+        });
+      } else {
+        response = await this.axios.post(path, snakecaseKeysDeep(body));
+      }
 
       const { data, config, request } = response;
 
@@ -421,7 +469,7 @@ export default class TelegramClient {
    */
   sendDocument(
     chatId: string | number,
-    document: string,
+    document: string | TelegramTypes.InputFile,
     options: TelegramTypes.SendDocumentOption = {}
   ): Promise<TelegramTypes.Message> {
     const optionsWithoutThumb = this.optionWithoutKeys(options, ['thumb']);
